@@ -1,0 +1,25 @@
+{
+  "manifest_version": 2,
+  "name": "cfast",
+  "version": "1.0",
+  "description": "Speedup codeforces submission viewer",
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "https://codeforces.com/*",
+    "https://mirror.codeforces.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://codeforces.com/contest/*/submission/*%3f.txt",
+        "https://mirror.codeforces.com/contest/*/submission/*%3f.txt"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
