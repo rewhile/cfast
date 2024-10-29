@@ -2,7 +2,7 @@
 
 Chrome extension to speedup viewing codeforces submissions
 
-## Preview
+# Preview
 
 Here is a speed comparison of opening five submissions from the blog https://codeforces.com/blog/entry/135457 before and after installing the extension
 
@@ -19,3 +19,7 @@ Here is a speed comparison of opening five submissions from the blog https://cod
 - Drag the zip into chrome://extensions/ and click install
 
 https://github.com/user-attachments/assets/4d648506-0baf-4f04-9142-45e8f0f11a3a
+
+# Credit
+
+[ToxicPie](https://codeforces.com/profile/ToxicPie9)
