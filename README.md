@@ -12,8 +12,10 @@ Here is a speed comparison of opening five submissions from the blog https://cod
 
 # Installation
 
-- Go to https://github.com/nullchilly/cfast/releases and download the zip file
+- Go to https://github.com/nullchilly/cfast/releases and download the `cfast.zip` file
 
 - Enable Developer mode on chrome://extensions/
 
 - Drag the zip into chrome://extensions/ and click install
+
+https://github.com/user-attachments/assets/4d648506-0baf-4f04-9142-45e8f0f11a3a
