@@ -6,8 +6,7 @@
   "permissions": [
     "webRequest",
     "webRequestBlocking",
-    "https://codeforces.com/*",
-    "https://mirror.codeforces.com/*"
+    "https://codeforces.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -15,11 +14,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://codeforces.com/contest/*/submission/*%3f.txt",
-        "https://mirror.codeforces.com/contest/*/submission/*%3f.txt"
+        "https://codeforces.com/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ]
 }
