@@ -114,10 +114,20 @@
           });
         } catch (e1) {
           try {
-            const dh = (JSON.parse(raw).diffHtml || '')
+            const j = JSON.parse(raw);
+            const dh = j.diffHtml || '';
+            const src = dh
               .replace(/<del[\s\S]*?<\/del>/gi, '')
-              .replace(/<br\s*\/?>/gi, '\n');
-            return JSON.stringify({ source: dh });
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<(ins|span)[^>]*>/gi, '')
+              .replace(/<\/(ins|span)>/gi, '')
+              .replace(/&nbsp;/g, ' ')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&amp;/g, '&')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'");
+            return JSON.stringify({ source: src });
           } catch {
             return JSON.stringify({ source: '' });
           }
