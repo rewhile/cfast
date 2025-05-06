@@ -40,9 +40,15 @@
                 const anchor = document.querySelector(
                   'a.view-source[submissionid="' + this._sid + '"]'
                 );
-                obj.href = anchor ? anchor.getAttribute('href') : '';
-
                 if (anchor) {
+                  const href = anchor.getAttribute('href');
+                  obj.href = href;
+
+                  const parts = href.split('/');
+                  const contestId = parts[2];
+                  obj.offerChallenge = "true";
+                  obj.challengeLink = `/contest/${contestId}/challenge/${this._sid}`;
+
                   const row = anchor.closest('tr');
 
                   const pa = row.querySelector('td[data-problemid] a');
