@@ -1,21 +1,18 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "cfast",
-  "version": "1.2",
+  "version": "1.3",
   "description": "Speedup codeforces submission viewer",
-  "permissions": [
-    "webRequest",
-    "webRequestBlocking",
-    "https://codeforces.com/*"
+  "host_permissions": ["https://codeforces.com/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["page.js"],
+      "matches": ["https://codeforces.com/*"]
+    }
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
   "content_scripts": [
     {
-      "matches": [
-        "https://codeforces.com/*"
-      ],
+      "matches": ["https://codeforces.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
