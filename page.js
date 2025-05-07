@@ -23,6 +23,7 @@
       : null;
   if (pageCid) initContestName(pageCid);
 
+  let currentSid = '';
   const _open = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function (m, u, a, b, c) {
     this._u = u; this._a = a; this._b = b; this._c = c;
@@ -42,6 +43,7 @@
           csrf = p.get('csrf_token');
         }
         this._sid = sid;
+        currentSid = sid;
         const qs = [
           'action=getDiff',
           'previousSubmissionId=20033',
@@ -136,4 +138,52 @@
     });
     return _send.apply(this, arguments);
   };
+
+  function addCompareUI() {
+    const header = document.querySelectorAll('.source-popup-header')[1];
+    if (!header || header.querySelector('#compare-btn')) return;
+
+    const hackLink = header.querySelector('a[href*="/challenge/"]');
+    if (!hackLink) return;
+
+    header.style.whiteSpace = 'nowrap';
+    header.style.overflow = 'visible';
+
+    const box = document.createElement('span');
+    box.innerHTML = `
+      <input id="compare-prev" placeholder="Previous ID" style="width:9ch;vertical-align:middle">
+      <input id="compare-cur"  placeholder="Current ID" value="${currentSid}" style="width:9ch;vertical-align:middle">
+      <button id="compare-btn" style="vertical-align:middle">Compare</button>
+    `;
+    hackLink.insertAdjacentElement('afterend', box);
+
+    document.getElementById('compare-btn').addEventListener('click', () => {
+      let prev = document.getElementById('compare-prev').value.trim();
+      if (!prev) prev = '20033';
+      const cur   = document.getElementById('compare-cur').value.trim();
+      const token = document.querySelector('input[name="csrf_token"]').value;
+      fetch(
+        `/data/submissionsDiff?${new URLSearchParams({
+          action:               'getDiff',
+          previousSubmissionId: prev,
+          currentSubmissionId:  cur,
+          csrf_token:           token
+        })}`,
+        { method: 'POST', credentials: 'same-origin' }
+      )
+      .then(r => r.json())
+      .then(j => {
+        const code = document.querySelectorAll('.source-popup-source')[1];
+        code.innerHTML = j.diffHtml;
+        if (window.PR) PR.prettyPrint();
+      })
+      .catch(console.error);
+    });
+  }
+  new MutationObserver(() => {
+    const codeEls = document.querySelectorAll('.source-popup-source');
+    if (codeEls.length > 1 && codeEls[1].innerHTML.trim() !== '') {
+      addCompareUI();
+    }
+  }).observe(document.body, { childList: true, subtree: true });
 })();
