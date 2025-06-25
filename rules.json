@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "regexSubstitution": "https://codeforces.com/favourite/submissions?contest=\\1&submission=\\2"
+      }
+    },
+    "condition": {
+      "regexFilter": "^https://codeforces\\.com/(?:contest|gym)/(\\d+)/submission/(\\d+)/?$"
+    }
+  }
+]
+

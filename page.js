@@ -1,9 +1,63 @@
 (function () {
+  function favouriteAndOpen() {
+    if (!location.pathname.startsWith('/favourite/submissions')) return;
+
+    const qs           = new URLSearchParams(location.search);
+    const contestId    = qs.get('contest');
+    const submissionId = qs.get('submission');
+    if (!contestId || !submissionId) return;
+
+    const csrf = document.querySelector('meta[name="X-Csrf-Token"]')?.content;
+    if (!csrf) {
+      console.warn('[cfast] CSRF token not found; aborting.');
+      return;
+    }
+
+    const row = document.querySelector(`tr[data-submission-id="${submissionId}"]`);
+
+    if (row) {
+      fetch('/data/favourite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body:
+          'entityId='    + encodeURIComponent(submissionId) +
+          '&type=SUBMISSION&isFavourite=false' +
+          '&csrf_token=' + encodeURIComponent(csrf),
+      }).catch(console.error);
+
+      history.replaceState(null, '', `/contest/${contestId}/submission/${submissionId}`);
+      const link = row.querySelector('a.view-source');
+      if (link) link.click();
+      return;
+    }
+
+    fetch('/data/favourite', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body:
+        'entityId=' + encodeURIComponent(submissionId) +
+        '&type=SUBMISSION&isFavourite=true' +
+        '&csrf_token=' + encodeURIComponent(csrf),
+    }).then(r => r.json()).then(j => {
+        if (j.success !== 'true') {
+          console.error('[cfast] favourite failed', j);
+          return;
+        }
+        location.reload();
+      }).catch(console.error);
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', favouriteAndOpen, { once: true });
+  } else {
+    favouriteAndOpen();
+  }
+
   const cache = {};
   function initContestName(cid) {
     if (!(cid in cache)) {
       cache[cid] = 'loading';
-      fetch(`https://codeforces.com/api/contest.standings?contestId=${cid}&from=1&count=1`)
+      if (cid) fetch(`https://codeforces.com/api/contest.standings?contestId=${cid}&from=1&count=1`)
         .then(r => r.json())
         .then(d => { cache[cid] = d.status === 'OK' ? d.result.contest.name : ''; })
         .catch(() => { cache[cid] = ''; });
@@ -180,10 +234,20 @@
       .catch(console.error);
     });
   }
-  new MutationObserver(() => {
-    const codeEls = document.querySelectorAll('.source-popup-source');
-    if (codeEls.length > 1 && codeEls[1].innerHTML.trim() !== '') {
-      addCompareUI();
-    }
-  }).observe(document.body, { childList: true, subtree: true });
+  function startObserver() {
+    const cb = () => {
+      const codeEls = document.querySelectorAll('.source-popup-source');
+      if (codeEls.length > 1 && codeEls[1].innerHTML.trim() !== '') addCompareUI();
+    };
+
+    (function attach() {
+      const target = document.body || document.documentElement;
+      if (!target) {
+        requestAnimationFrame(attach);
+        return;
+      }
+      new MutationObserver(cb).observe(target, { childList: true, subtree: true });
+    })();
+  }
+  startObserver();
 })();
