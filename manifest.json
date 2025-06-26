@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "cfast",
-  "version": "1.6",
+  "version": "1.8",
   "description": "Speedup codeforces submission viewer",
   "host_permissions": ["https://codeforces.com/*"],
   "web_accessible_resources": [

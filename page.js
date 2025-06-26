@@ -1,27 +1,89 @@
 (function () {
-  const cache = {};
-  function initContestName(cid) {
-    if (!(cid in cache)) {
-      cache[cid] = 'loading';
-      if (cid) fetch(`https://codeforces.com/api/contest.standings?contestId=${cid}&from=1&count=1`)
-        .then(r => r.json())
-        .then(d => { cache[cid] = d.status === 'OK' ? d.result.contest.name : ''; })
-        .catch(() => { cache[cid] = ''; });
-    }
+  const contestMeta = {};
+  const TTL_MS      = 24 * 60 * 60 * 1000;
+
+  (() => {
+    try {
+      const raw = localStorage.getItem('cfast_contest_list');
+      const ts  = +localStorage.getItem('cfast_contest_list_ts') || 0;
+      if (raw && Date.now() - ts < TTL_MS) {
+        JSON.parse(raw).forEach(c => {
+          contestMeta[c.id] = { name:c.name, start:c.start, dur:c.dur };
+        });
+      }
+    } catch {}
+  })();
+
+  let metaPromise = null;
+  function refreshContestMeta () {
+    if (metaPromise) return metaPromise;
+    metaPromise = fetch('https://codeforces.com/api/contest.list')
+      .then(r => r.json())
+      .then(j => {
+        if (j.status !== 'OK') return;
+        const arr = j.result.map(c => ({
+          id: c.id, name: c.name,
+          start: c.startTimeSeconds, dur: c.durationSeconds
+        }));
+        arr.forEach(c => { contestMeta[c.id] = {name:c.name,start:c.start,dur:c.dur}; });
+        try{
+          localStorage.setItem('cfast_contest_list', JSON.stringify(arr));
+          localStorage.setItem('cfast_contest_list_ts', Date.now().toString());
+        }catch{}
+      })
+      .catch(console.error);
+    return metaPromise;
+  }
+
+  function ensureContest(cid){
+    if (contestMeta[cid]) return;
+    const ts  = +localStorage.getItem('cfast_contest_list_ts') || 0;
+    if (Date.now() - ts > TTL_MS) metaPromise = null;
+    refreshContestMeta();
+  }
+
+  function parseSubmissionTs(row) {
+    const td  = row.querySelector('td:nth-child(2)');
+    if (!td) return 0;
+    const raw = td.childNodes[0].wholeText.trim();
+    const sup = td.querySelector('sup')?.textContent || '';
+    console.log(td, raw, sup)
+    const m   = sup.match(/UTC([+-]?\d+)/);
+    const off = m ? Number(m[1]) : 0;
+    const date = new Date(`${raw} UTC${off >= 0 ? '+' : ''}${off}`);
+    return Math.floor(date.getTime() / 1000);
+  }
+
+  function contestLabel(cid, ts) {
+    const meta = contestMeta[cid];
+    if (!meta) { ensureContest(); return 'loading'; }
+    console.log(meta.start, meta.dur, ts)
+    const during =
+      ts && meta.start && meta.dur &&
+      ts >= meta.start && ts <= meta.start + meta.dur;
+    const tag   = during
+        ? '<span style="color:green">DURING</span>'
+        : '<span style="color:red">PRACTICE</span>';
+    return `${tag} ${meta.name}`;
   }
 
   const path = location.pathname;
   const mStatus = path.match(/^\/contest\/(\d+)\/status\b/);
   const mStand = path.match(/^\/contest\/(\d+)\/standings\b/);
+  const mFav   = path.match(/^\/favourite\/submissions\b/);
   const mPersonal = path.match(/^\/submissions\//);
   const pageType = mStatus ? 'status'
     : mStand ? 'standings'
       : mPersonal ? 'personal'
-        : null;
-  const pageCid = mStatus ? mStatus[1]
+        :  mFav        ? 'status'
+          : null;
+  let pageCid = mStatus ? mStatus[1]
     : mStand ? mStand[1]
       : null;
-  if (pageCid) initContestName(pageCid);
+  if (mFav && !pageCid) {
+    pageCid = new URLSearchParams(location.search).get('contest');
+  }
+  if (pageCid) ensureContest(pageCid);
 
   let currentSid = '';
   const _open = XMLHttpRequest.prototype.open;
@@ -78,8 +140,8 @@
           const offerChallenge = 'true';
 
           if (pageType === 'standings') {
-            if (!(pageCid in cache)) initContestName(pageCid);
-            const name = cache[pageCid];
+            ensureContest(pageCid)
+            const name = contestMeta[pageCid]?.name || 'loading';
             const href = `/contest/${pageCid}/submission/${sid}`;
             const challengeLink = `/contest/${pageCid}/challenge/${sid}`;
             return JSON.stringify({ contestName: name, source: src, href, challengeLink, offerChallenge });
@@ -95,8 +157,9 @@
             : pageType === 'personal'
               ? ((parts[1] === 'contest' || parts[1] === 'gym') ? parts[2] : pageCid)
               : pageCid;
-          if (!(effectiveCid in cache)) initContestName(effectiveCid);
-          const contestName = cache[effectiveCid] || 'loading';
+          ensureContest(effectiveCid);
+          const subTs       = parseSubmissionTs(row);
+          const contestName = contestLabel(effectiveCid, subTs);
           let href = (row.querySelector(`a.view-source[submissionid="${sid}"]`) || {}).getAttribute('href') || '';
           if (!href.startsWith(`/contest/${effectiveCid}/submission/`) && !href.startsWith(`/gym/${effectiveCid}/submission/`)) {
             href = `/${parts[1]}/${parts[2]}/submission/${sid}`;
