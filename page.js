@@ -47,7 +47,6 @@
     if (!td) return 0;
     const raw = td.childNodes[0].wholeText.trim();
     const sup = td.querySelector('sup')?.textContent || '';
-    console.log(td, raw, sup)
     const m   = sup.match(/UTC([+-]?\d+)/);
     const off = m ? Number(m[1]) : 0;
     const date = new Date(`${raw} UTC${off >= 0 ? '+' : ''}${off}`);
@@ -57,7 +56,6 @@
   function contestLabel(cid, ts) {
     const meta = contestMeta[cid];
     if (!meta) { ensureContest(); return 'loading'; }
-    console.log(meta.start, meta.dur, ts)
     const during =
       ts && meta.start && meta.dur &&
       ts >= meta.start && ts <= meta.start + meta.dur;
