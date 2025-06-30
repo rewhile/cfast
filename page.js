@@ -221,9 +221,9 @@
 
     const box = document.createElement('span');
     box.innerHTML = `
+      <button id="compare-btn" style="vertical-align:middle">Compare</button>
       <input id="compare-prev" placeholder="Previous ID" value="${prevId}" style="width:9ch;vertical-align:middle">
       <input id="compare-cur"  placeholder="Current ID" value="${currentSid}" style="width:9ch;vertical-align:middle">
-      <button id="compare-btn" style="vertical-align:middle">Compare</button>
     `;
     hackLink.insertAdjacentElement('afterend', box);
 
