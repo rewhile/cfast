@@ -210,9 +210,18 @@
     header.style.whiteSpace = 'nowrap';
     header.style.overflow = 'visible';
 
+    const currentRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
+    let prevId = '';
+    if (currentRow) {
+      const prevRow = currentRow.nextElementSibling;
+      if (prevRow && prevRow.hasAttribute('data-submission-id')) {
+        prevId = prevRow.getAttribute('data-submission-id');
+      }
+    }
+
     const box = document.createElement('span');
     box.innerHTML = `
-      <input id="compare-prev" placeholder="Previous ID" style="width:9ch;vertical-align:middle">
+      <input id="compare-prev" placeholder="Previous ID" value="${prevId}" style="width:9ch;vertical-align:middle">
       <input id="compare-cur"  placeholder="Current ID" value="${currentSid}" style="width:9ch;vertical-align:middle">
       <button id="compare-btn" style="vertical-align:middle">Compare</button>
     `;

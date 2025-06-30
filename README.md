@@ -1,6 +1,6 @@
 # CFast
 
-Chrome extension to ~~speedup~~ viewing codeforces submissions
+Chrome extension to view codeforces submissions without rate limit
 
 # Preview
 
