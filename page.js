@@ -202,7 +202,9 @@
 
   let compareModeActive = false;
   document.addEventListener('keydown', function(e) {
-    if (!/^\/submissions\//.test(location.pathname)) return;
+    if (!/^\/submissions\//.test(location.pathname)
+      && !/^\/favourite\/submissions/.test(location.pathname)
+      && !/^\/contest\/\d+\/status/.test(location.pathname)) return;
     const popupHeaders = document.querySelectorAll('.source-popup-header');
     const popupSources = document.querySelectorAll('.source-popup-source');
     const popupHeader = popupHeaders[1] || popupHeaders[0];
