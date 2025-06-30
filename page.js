@@ -201,6 +201,7 @@
   };
 
   let compareModeActive = false;
+  let popupWasOpen = false;
   document.addEventListener('keydown', function(e) {
     // Only on /submissions/ pages
     if (!/^\/submissions\//.test(location.pathname)) return;
@@ -265,7 +266,26 @@
   function startObserver() {
     const cb = () => {
       const codeEls = document.querySelectorAll('.source-popup-source');
-      if (codeEls.length > 1 && codeEls[1].innerHTML.trim() !== '') addCompareUI();
+      const headerEls = document.querySelectorAll('.source-popup-header');
+      const popupIsOpen = codeEls.length > 1 && codeEls[1].innerHTML.trim() !== '' && headerEls.length > 1;
+
+      if (!popupIsOpen) {
+        if (compareModeActive) {
+          compareModeActive = false;
+          console.log('[cfast] Compare Mode: OFF (popup closed)');
+        }
+        removeCompareUI();
+        popupWasOpen = false;
+        return;
+      }
+
+      // Only reset state/UI if popup just opened
+      if (!popupWasOpen) {
+        compareModeActive = false;
+        removeCompareUI();
+        addCompareUI();
+        popupWasOpen = true;
+      }
     };
 
     (function attach() {
