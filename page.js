@@ -200,56 +200,68 @@
     return _send.apply(this, arguments);
   };
 
-  function addCompareUI() {
-    const header = document.querySelectorAll('.source-popup-header')[1];
-    if (!header || header.querySelector('#compare-btn')) return;
-
-    const hackLink = header.querySelector('a[href*="/challenge/"]');
-    if (!hackLink) return;
-
-    header.style.whiteSpace = 'nowrap';
-    header.style.overflow = 'visible';
-
-    const currentRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
-    let prevId = '';
-    if (currentRow) {
-      const prevRow = currentRow.nextElementSibling;
-      if (prevRow && prevRow.hasAttribute('data-submission-id')) {
-        prevId = prevRow.getAttribute('data-submission-id');
+  let compareModeActive = false;
+  document.addEventListener('keydown', function(e) {
+    // Only on /submissions/ pages
+    if (!/^\/submissions\//.test(location.pathname)) return;
+    // Only if popup is open
+    const popupHeaders = document.querySelectorAll('.source-popup-header');
+    const popupSources = document.querySelectorAll('.source-popup-source');
+    const popupHeader = popupHeaders[1] || popupHeaders[0];
+    const popupSource = popupSources[1] || popupSources[0];
+    if (!popupHeader || !popupSource || popupSource.innerHTML.trim() === '') return;
+    // Shift+C toggles Compare Mode
+    if (e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+      if (e.repeat) return; // Debounce: ignore if key is held down
+      e.preventDefault();
+      compareModeActive = !compareModeActive;
+      console.log('[cfast] Compare Mode:', compareModeActive ? 'ON' : 'OFF');
+      if (compareModeActive) {
+        const btn = document.getElementById('compare-btn');
+        if (btn) btn.click();
+      } else {
+        // Reload the current submission's source (not compare)
+        const curRow = document.querySelector(`tr[data-submission-id=\"${currentSid}\"]`);
+        if (curRow) {
+          const link = curRow.querySelector('a.view-source');
+          if (link) link.click();
+        }
       }
+      return;
     }
+    // Only if Shift+Left or Shift+Right
+    if (!e.shiftKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    if (e.repeat) return; // Debounce: ignore if key is held down
+    // Prevent default browser action
+    e.preventDefault();
+    // Find current row
+    const curRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
+    if (!curRow) return;
+    let targetRow = null;
+    if (e.key === 'ArrowLeft') {
+      // Previous row with data-submission-id
+      let prev = curRow.previousElementSibling;
+      while (prev && !prev.hasAttribute('data-submission-id')) prev = prev.previousElementSibling;
+      targetRow = prev;
+    } else if (e.key === 'ArrowRight') {
+      // Next row with data-submission-id
+      let next = curRow.nextElementSibling;
+      while (next && !next.hasAttribute('data-submission-id')) next = next.nextElementSibling;
+      targetRow = next;
+    }
+    if (targetRow) {
+      const link = targetRow.querySelector('a.view-source');
+      if (link) link.click();
+      // If compare mode is active, press Compare after navigation
+      setTimeout(() => {
+        if (compareModeActive) {
+          const btn = document.getElementById('compare-btn');
+          if (btn) btn.click();
+        }
+      }, 200);
+    }
+  });
 
-    const box = document.createElement('span');
-    box.innerHTML = `
-      <button id="compare-btn" style="vertical-align:middle">Compare</button>
-      <input id="compare-prev" placeholder="Previous ID" value="${prevId}" style="width:9ch;vertical-align:middle">
-      <input id="compare-cur"  placeholder="Current ID" value="${currentSid}" style="width:9ch;vertical-align:middle">
-    `;
-    hackLink.insertAdjacentElement('afterend', box);
-
-    document.getElementById('compare-btn').addEventListener('click', () => {
-      let prev = document.getElementById('compare-prev').value.trim();
-      if (!prev) prev = '20033';
-      const cur   = document.getElementById('compare-cur').value.trim();
-      const token = document.querySelector('input[name="csrf_token"]').value;
-      fetch(
-        `/data/submissionsDiff?${new URLSearchParams({
-          action:               'getDiff',
-          previousSubmissionId: prev,
-          currentSubmissionId:  cur,
-          csrf_token:           token
-        })}`,
-        { method: 'POST', credentials: 'same-origin' }
-      )
-      .then(r => r.json())
-      .then(j => {
-        const code = document.querySelectorAll('.source-popup-source')[1];
-        code.innerHTML = j.diffHtml;
-        if (window.PR) PR.prettyPrint();
-      })
-      .catch(console.error);
-    });
-  }
   function startObserver() {
     const cb = () => {
       const codeEls = document.querySelectorAll('.source-popup-source');
@@ -319,5 +331,85 @@
     window.addEventListener('DOMContentLoaded', favouriteAndOpen, { once: true });
   } else {
     favouriteAndOpen();
+  }
+
+  function addCompareUI(force) {
+    const header = document.querySelectorAll('.source-popup-header')[1] || document.querySelectorAll('.source-popup-header')[0];
+    if (!header) return;
+    let box = header.querySelector('#compare-box');
+    if (box && !force) return;
+    // Remove existing if force update
+    if (box && force) box.remove();
+
+    const hackLink = header.querySelector('a[href*="/challenge/"]');
+    header.style.whiteSpace = 'nowrap';
+    header.style.overflow = 'visible';
+
+    const currentRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
+    let prevId = '';
+    if (currentRow) {
+      const prevRow = currentRow.nextElementSibling;
+      if (prevRow && prevRow.hasAttribute('data-submission-id')) {
+        prevId = prevRow.getAttribute('data-submission-id');
+      }
+    }
+
+    box = document.createElement('span');
+    box.id = 'compare-box';
+    box.innerHTML = `
+      <button id="compare-btn" style="vertical-align:middle">Compare</button>
+      <input id="compare-prev" placeholder="Previous ID" value="${prevId}" style="width:9ch;vertical-align:middle">
+      <input id="compare-cur"  placeholder="Current ID" value="${currentSid}" style="width:9ch;vertical-align:middle">
+    `;
+    // Insert Compare UI
+    if (hackLink) {
+      hackLink.insertAdjacentElement('afterend', box);
+    } else {
+      header.appendChild(box);
+    }
+
+    document.getElementById('compare-btn').addEventListener('click', () => {
+      let prev = document.getElementById('compare-prev').value.trim();
+      if (!prev) prev = '20033';
+      const cur   = document.getElementById('compare-cur').value.trim();
+      const token = document.querySelector('input[name="csrf_token"]').value;
+      fetch(
+        `/data/submissionsDiff?${new URLSearchParams({
+          action:               'getDiff',
+          previousSubmissionId: prev,
+          currentSubmissionId:  cur,
+          csrf_token:           token
+        })}`,
+        { method: 'POST', credentials: 'same-origin' }
+      )
+      .then(r => r.json())
+      .then(j => {
+        const code = document.querySelectorAll('.source-popup-source')[1] || document.querySelectorAll('.source-popup-source')[0];
+        code.innerHTML = j.diffHtml;
+        if (window.PR) PR.prettyPrint();
+      })
+      .catch(console.error);
+    });
+  }
+
+  function removeCompareUI() {
+    const header = document.querySelectorAll('.source-popup-header')[1] || document.querySelectorAll('.source-popup-header')[0];
+    const box = header?.querySelector('#compare-box');
+    if (box) box.remove();
+  }
+
+  function setCompareFields() {
+    const currentRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
+    let prevId = '';
+    if (currentRow) {
+      const prevRow = currentRow.nextElementSibling;
+      if (prevRow && prevRow.hasAttribute('data-submission-id')) {
+        prevId = prevRow.getAttribute('data-submission-id');
+      }
+    }
+    const prevInput = document.getElementById('compare-prev');
+    const curInput = document.getElementById('compare-cur');
+    if (prevInput) prevInput.value = prevId;
+    if (curInput) curInput.value = currentSid;
   }
 })();
