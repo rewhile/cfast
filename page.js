@@ -157,7 +157,8 @@
               : pageCid;
           ensureContest(effectiveCid);
           const subTs       = parseSubmissionTs(row);
-          const contestName = contestLabel(effectiveCid, subTs);
+          const meta        = contestMeta[effectiveCid];
+          let   contestName = contestLabel(effectiveCid, subTs);
           let href = (row.querySelector(`a.view-source[submissionid="${sid}"]`) || {}).getAttribute('href') || '';
           if (!href.startsWith(`/contest/${effectiveCid}/submission/`) && !href.startsWith(`/gym/${effectiveCid}/submission/`)) {
             href = `/${parts[1]}/${parts[2]}/submission/${sid}`;
@@ -168,8 +169,15 @@
           const problemName = m2 ? `(${m2[1]}) ${m2[2]}` : t;
           const ua = row.querySelector('td.status-party-cell a');
           const partyName = ua ? `<span title="${ua.title}" class="${ua.className}">${ua.textContent.trim()}</span>` : '';
+          const handle    = ua ? ua.textContent.trim() : '';
           const ve = row.querySelector('.submissionVerdictWrapper>span') || row.querySelector('td.status-verdict-cell span');
           const verdict = ve ? ve.outerHTML : 'Compilation error';
+
+          if (handle && meta?.name) {
+            const url  = `/submissions/${encodeURIComponent(handle)}/contest/${effectiveCid}`;
+            const link = `<a href="${url}" target="_blank">${meta.name}</a>`;
+            contestName = contestName.replace(meta.name, link);
+          }
 
           return JSON.stringify({
             offerChallenge, source: src, href, challengeLink,
