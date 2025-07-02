@@ -1,6 +1,7 @@
 (function () {
   const contestMeta = {};
   const TTL_MS      = 24 * 60 * 60 * 1000;
+  const standingsInfo = {};
 
   (() => {
     try {
@@ -91,6 +92,40 @@
   };
   const _send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function (body) {
+    if (this._u.includes('/data/standings')) {
+      this.addEventListener('load', () => {
+        try {
+          const arr   = JSON.parse(this.responseText);
+          let lastSid = '';
+          for (const item of arr) {
+            if (item.type !== 'SUBMIT') continue;
+            const sid = String(item.submissionId);
+
+            let problemName = '';
+            const pm = item.problem.match(/title="([^"]+)"[^>]*>([^<]+)<\/a>/);
+            if (pm) problemName = `(${pm[2]}) ${pm[1]}`;
+
+          let ctSec, ctAbs;
+          if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(item.contestTime)) {
+            const p = item.contestTime.split(':').map(Number);
+            ctSec   = p[0] * 3600 + p[1] * 60 + (p[2] ?? 0);
+          } else {
+            const d = new Date(item.contestTime.replace(/\u00a0/g, ' '));
+            if (!isNaN(d)) ctAbs = Math.floor(d.getTime() / 1000);
+          }
+            standingsInfo[sid] = {
+              prevId   : lastSid,
+              verdict  : item.verdict,
+              problem  : problemName,
+              partyHTML: item.party,
+              ctSec,
+              ctAbs
+            };
+            lastSid = sid;
+          }
+        } catch(e) { console.error('[cfast] standings parse failed', e); }
+      })
+    }
     if (this._u.includes('/data/submitSource')) {
       try {
         let sid, csrf;
@@ -138,11 +173,73 @@
           const offerChallenge = 'true';
 
           if (pageType === 'standings') {
-            ensureContest(pageCid)
-            const name = contestMeta[pageCid]?.name || 'loading';
-            const href = `/contest/${pageCid}/submission/${sid}`;
+            ensureContest(pageCid);
+
+          let cell =
+            document.querySelector(`td[acceptedsubmissionid="${sid}"], td[submissionid="${sid}"]`);
+          if (!cell) {
+            const linkEl = document.querySelector(`a[href*="/submission/${sid}"]`);
+            cell = linkEl ? linkEl.closest('td') : null;
+          }
+          const row = cell ? cell.closest('tr') : (document.querySelector(`a[href*="/submission/${sid}"]`)?.closest('tr') ?? null);
+
+          const cached = standingsInfo[sid] || {};
+
+          let partyName = '';
+          let handle    = '';
+          if (row) {
+            const ua = row.querySelector('.contestant-cell a, a[href^="/profile/"]');
+            if (ua) {
+              handle    = ua.textContent.trim();
+              partyName = `<span title="${ua.title}" class="${ua.className}">${handle}</span>`;
+            }
+          }
+          if (!partyName && cached.partyHTML) {
+            partyName = cached.partyHTML;
+            const mH  = cached.partyHTML.match(/\/profile\/([^"]+)/);
+            if (mH) handle = mH[1];
+          }
+
+            const meta = contestMeta[pageCid];
+            let   contestName = meta ? meta.name : 'loading';
+            if (meta?.name && handle) {
+              const url = `/submissions/${encodeURIComponent(handle)}/contest/${pageCid}`;
+              contestName =
+                contestName.replace(meta.name, `<a href="${url}" target="_blank">${meta.name}</a>`);
+            }
+
+          let problemName = '';
+
+          if (!problemName && cell && cell.cellIndex !== undefined) {
+            const th = cell.closest('table')?.rows[0]?.cells[cell.cellIndex];
+            const a  = th?.querySelector('a');
+            if (a) {
+              const t = (a.getAttribute('title') || a.textContent).trim();
+              const m = t.match(/^([A-Z])\s*-\s*(.*)$/);
+              problemName = m ? `(${m[1]}) ${m[2]}` : t;
+            }
+          }
+          if (!problemName && cached.problem) problemName = cached.problem;
+
+          let verdict = cached.verdict || '—';
+          if (verdict === '—' && cell) {
+            const ok  = cell.querySelector('.cell-accepted');
+            const bad = cell.querySelector('.cell-rejected');
+            verdict   = ok ? ok.outerHTML : bad ? bad.outerHTML : 'Compilation error';
+          }
+
+            const href          = `/contest/${pageCid}/submission/${sid}`;
             const challengeLink = `/contest/${pageCid}/challenge/${sid}`;
-            return JSON.stringify({ contestName: name, source: src, href, challengeLink, offerChallenge });
+            return JSON.stringify({
+              contestName,
+              problemName,
+              partyName,
+              verdict,
+              source: src,
+              href,
+              challengeLink,
+              offerChallenge
+            });
           }
 
           const row = document.querySelector(`tr[data-submission-id="${sid}"]`);
@@ -344,12 +441,23 @@
     header.style.whiteSpace = 'nowrap';
     header.style.overflow = 'visible';
 
-    const currentRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
     let prevId = '';
-    if (currentRow) {
-      const prevRow = currentRow.nextElementSibling;
-      if (prevRow && prevRow.hasAttribute('data-submission-id')) {
-        prevId = prevRow.getAttribute('data-submission-id');
+    if (pageType === 'standings') {
+      const cell =
+        document.querySelector(`td[acceptedsubmissionid="${currentSid}"], td[submissionid="${currentSid}"]`) ||
+        document.querySelector(`a[href*="/submission/${currentSid}"]`)?.closest('td');
+      const aid = cell?.getAttribute('acceptedsubmissionid');
+      if (aid && aid !== currentSid) prevId = aid;
+      if (!prevId && standingsInfo[currentSid]?.prevId) {
+        prevId = standingsInfo[currentSid].prevId;
+      }
+    } else {
+      const currentRow = document.querySelector(`tr[data-submission-id="${currentSid}"]`);
+      if (currentRow) {
+        const prevRow = currentRow.nextElementSibling;
+        if (prevRow && prevRow.hasAttribute('data-submission-id')) {
+          prevId = prevRow.getAttribute('data-submission-id');
+        }
       }
     }
 
@@ -374,17 +482,30 @@
       const token = document.querySelector('input[name="csrf_token"]').value;
 
       (function updateBtnWithDiff () {
+        let diff = null;
+
         const prevRow = document.querySelector(`tr[data-submission-id="${prev}"]`);
         const curRow  = document.querySelector(`tr[data-submission-id="${cur}"]`);
-        if (!prevRow || !curRow) return;
+        if (prevRow && curRow) {
+          const prevTs = parseSubmissionTs(prevRow);
+          const curTs  = parseSubmissionTs(curRow);
+          if (prevTs && curTs) diff = Math.abs(curTs - prevTs);
+        }
 
-        const prevTs = parseSubmissionTs(prevRow);
-        const curTs  = parseSubmissionTs(curRow);
-        if (!prevTs || !curTs) return;
+        if (diff === null && pageType === 'standings') {
+          const pInfo = standingsInfo[prev] || {};
+          const cInfo = standingsInfo[cur]  || {};
+          if (pInfo.ctSec !== undefined && cInfo.ctSec !== undefined) {
+            diff = Math.abs(cInfo.ctSec - pInfo.ctSec);
+          } else if (pInfo.ctAbs !== undefined && cInfo.ctAbs !== undefined) {
+            diff = Math.abs(cInfo.ctAbs - pInfo.ctAbs);
+          }
+        }
 
-        const diff   = Math.abs(curTs - prevTs);
-        const mm     = Math.floor(diff / 60);
-        const ss     = diff % 60;
+        if (diff === null) return;
+
+        const mm = Math.floor(diff / 60);
+        const ss = diff % 60;
         compareBtn.textContent = `${mm}:${ss.toString().padStart(2,'0')} diff`;
       })();
 
