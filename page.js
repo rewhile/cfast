@@ -358,11 +358,28 @@
       header.appendChild(box);
     }
 
-    document.getElementById('compare-btn').addEventListener('click', () => {
+    const compareBtn = document.getElementById('compare-btn');
+    compareBtn.addEventListener('click', () => {
       let prev = document.getElementById('compare-prev').value.trim();
       if (!prev) prev = '20033';
       const cur   = document.getElementById('compare-cur').value.trim();
       const token = document.querySelector('input[name="csrf_token"]').value;
+
+      (function updateBtnWithDiff () {
+        const prevRow = document.querySelector(`tr[data-submission-id="${prev}"]`);
+        const curRow  = document.querySelector(`tr[data-submission-id="${cur}"]`);
+        if (!prevRow || !curRow) return;
+
+        const prevTs = parseSubmissionTs(prevRow);
+        const curTs  = parseSubmissionTs(curRow);
+        if (!prevTs || !curTs) return;
+
+        const diff   = Math.abs(curTs - prevTs);
+        const mm     = Math.floor(diff / 60);
+        const ss     = diff % 60;
+        compareBtn.textContent = `${mm}:${ss.toString().padStart(2,'0')} diff`;
+      })();
+
       fetch(
         `/data/submissionsDiff?${new URLSearchParams({
           action:               'getDiff',
