@@ -68,7 +68,7 @@
 
   const path = location.pathname;
   const mStatus = path.match(/^\/contest\/(\d+)\/status\b/);
-  const mStand = path.match(/^\/contest\/(\d+)\/standings\b/);
+  const mStand = path.match(/^\/(gym|contest)\/(\d+)\/standings\b/);
   const mFav   = path.match(/^\/favourite\/submissions\b/);
   const mPersonal = path.match(/^\/submissions\//);
   const pageType = mStatus ? 'status'
@@ -76,8 +76,9 @@
       : mPersonal ? 'personal'
         :  mFav        ? 'status'
           : null;
+  console.log(mStand)
   let pageCid = mStatus ? mStatus[1]
-    : mStand ? mStand[1]
+    : mStand ? mStand[2]
       : null;
   if (mFav && !pageCid) {
     pageCid = new URLSearchParams(location.search).get('contest');
@@ -201,11 +202,10 @@
           }
 
             const meta = contestMeta[pageCid];
-            let   contestName = meta ? meta.name : 'loading';
-            if (meta?.name && handle) {
+            let contestName = meta ? meta.name : document.querySelector('.contest-name').childNodes[1].textContent.trim();
+            if (contestName && handle) {
               const url = `/submissions/${encodeURIComponent(handle)}/contest/${pageCid}`;
-              contestName =
-                contestName.replace(meta.name, `<a href="${url}" target="_blank">${meta.name}</a>`);
+              contestName = `<a href="${url}" target="_blank">${contestName}</a>`;
             }
 
           let problemName = '';
@@ -258,7 +258,7 @@
           let   contestName = contestLabel(effectiveCid, subTs);
           let href = (row.querySelector(`a.view-source[submissionid="${sid}"]`) || {}).getAttribute('href') || '';
           if (!href.startsWith(`/contest/${effectiveCid}/submission/`) && !href.startsWith(`/gym/${effectiveCid}/submission/`)) {
-            href = `/${parts[1]}/${parts[2]}/submission/${sid}`;
+            href = `/contest/${parts[2]}/submission/${sid}`;
           }
           const challengeLink = `/contest/${effectiveCid}/challenge/${sid}`;
           const t = prob.textContent.trim();
